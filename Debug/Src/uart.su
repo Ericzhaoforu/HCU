@@ -1,0 +1,3 @@
+../Src/uart.c:9:6:MX_USART1_Init	8	static
+../Src/uart.c:27:6:HAL_UART_MspInit	48	static
+../Src/uart.c:64:6:Uart_Send	24	static

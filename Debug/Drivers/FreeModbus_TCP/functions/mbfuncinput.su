@@ -1,0 +1,1 @@
+../Drivers/FreeModbus_TCP/functions/mbfuncinput.c:58:1:eMBFuncReadInputRegister	32	static

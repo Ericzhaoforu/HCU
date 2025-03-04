@@ -1,0 +1,7 @@
+../Drivers/FreeModbus_TCP/mb.c:129:1:eMBInit	24	static
+../Drivers/FreeModbus_TCP/mb.c:196:1:eMBTCPInit	24	static
+../Drivers/FreeModbus_TCP/mb.c:225:1:eMBRegisterCB	24	static
+../Drivers/FreeModbus_TCP/mb.c:272:1:eMBClose	16	static
+../Drivers/FreeModbus_TCP/mb.c:291:1:eMBEnable	16	static
+../Drivers/FreeModbus_TCP/mb.c:309:1:eMBDisable	16	static
+../Drivers/FreeModbus_TCP/mb.c:331:1:eMBPoll	24	static

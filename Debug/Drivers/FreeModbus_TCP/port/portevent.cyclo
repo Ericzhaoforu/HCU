@@ -1,0 +1,3 @@
+../Drivers/FreeModbus_TCP/port/portevent.c:11:1:xMBPortEventInit	1
+../Drivers/FreeModbus_TCP/port/portevent.c:18:1:xMBPortEventPost	1
+../Drivers/FreeModbus_TCP/port/portevent.c:26:1:xMBPortEventGet	2

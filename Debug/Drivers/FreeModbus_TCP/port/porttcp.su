@@ -1,0 +1,9 @@
+../Drivers/FreeModbus_TCP/port/porttcp.c:64:1:xMBTCPPortInit	32	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:112:1:prvvMBPortReleaseClient	32	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:139:1:vMBTCPPortClose	8	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:152:1:vMBTCPPortDisable	8	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:158:1:prvxMBTCPPortAccept	48	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:207:1:prvvMBTCPPortError	24	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:221:1:prvxMBTCPPortReceive	32	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:294:1:xMBTCPPortGetRequest	16	static
+../Drivers/FreeModbus_TCP/port/porttcp.c:305:1:xMBTCPPortSendResponse	24	static

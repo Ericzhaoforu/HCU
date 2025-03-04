@@ -1,0 +1,9 @@
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:7:6:ModbusTCPInit	8	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:13:6:ModbusTCPDeInit	8	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:19:6:ModbusTCPMain	8	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:34:14:eMBRegCoilsCB	32	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:85:14:eMBRegDiscreteCB	24	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:146:14:eMBRegHoldingCB	32	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:190:14:eMBRegInputCB	24	static
+../Drivers/FreeModbus_TCP/User_modbus_TCP.c:217:6:_sys_exit	16	static
+C:\ST\STM32CubeIDE_1.14.1\STM32CubeIDE\plugins\com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.win32_1.1.100.202309141235\tools\bin/../lib/gcc/arm-none-eabi/11.3.1/../../../../arm-none-eabi/include/stdio.h:224:5:fputc	16	static

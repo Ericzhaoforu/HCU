@@ -1,0 +1,13 @@
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:95:6:Powerstep01_Board_Delay	16	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:104:6:Powerstep01_Board_DisableIrq	4	static,ignoring_inline_asm
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:113:6:Powerstep01_Board_EnableIrq	4	static,ignoring_inline_asm
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:123:6:Powerstep01_Board_GpioInit	56	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:189:6:Powerstep01_Board_StepClockInit	64	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:222:6:Powerstep01_Board_StartStepClock	24	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:236:6:Powerstep01_Board_StopStepClock	8	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:246:6:Powerstep01_Board_ReleaseReset	16	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:256:6:Powerstep01_Board_Reset	16	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:265:9:Powerstep01_Board_SpiInit	16	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:295:9:Powerstep01_Board_SpiWriteBytes	40	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:319:10:Powerstep01_Board_BUSY_PIN_GetState	8	static
+../Drivers/BSP/X-NUCLEO-IHMxx/x_nucleo_ihm03a1_stm32f4xx.c:328:10:Powerstep01_Board_FLAG_PIN_GetState	8	static

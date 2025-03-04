@@ -1,0 +1,2 @@
+../Src/tim.c:4:6:MX_TIM2_Init	56	static
+../Src/tim.c:44:6:HAL_TIM_Encoder_MspInit	48	static

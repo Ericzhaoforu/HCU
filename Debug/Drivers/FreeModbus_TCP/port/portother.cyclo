@@ -1,0 +1,2 @@
+../Drivers/FreeModbus_TCP/port/portother.c:36:1:prvvMBTCPLogFrame	13
+../Drivers/FreeModbus_TCP/port/portother.c:115:1:vMBPortLog	1

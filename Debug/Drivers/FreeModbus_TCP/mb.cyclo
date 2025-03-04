@@ -1,0 +1,7 @@
+../Drivers/FreeModbus_TCP/mb.c:129:1:eMBInit	6
+../Drivers/FreeModbus_TCP/mb.c:196:1:eMBTCPInit	3
+../Drivers/FreeModbus_TCP/mb.c:225:1:eMBRegisterCB	10
+../Drivers/FreeModbus_TCP/mb.c:272:1:eMBClose	3
+../Drivers/FreeModbus_TCP/mb.c:291:1:eMBEnable	2
+../Drivers/FreeModbus_TCP/mb.c:309:1:eMBDisable	3
+../Drivers/FreeModbus_TCP/mb.c:331:1:eMBPoll	13

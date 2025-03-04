@@ -1,0 +1,3 @@
+../Drivers/FreeModbus_TCP/functions/mbfunccoils.c:68:1:eMBFuncReadCoils	6
+../Drivers/FreeModbus_TCP/functions/mbfunccoils.c:147:1:eMBFuncWriteCoil	7
+../Drivers/FreeModbus_TCP/functions/mbfunccoils.c:201:1:eMBFuncWriteMultipleCoils	7

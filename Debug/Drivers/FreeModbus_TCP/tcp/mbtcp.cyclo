@@ -1,0 +1,5 @@
+../Drivers/FreeModbus_TCP/tcp/mbtcp.c:80:1:eMBTCPDoInit	2
+../Drivers/FreeModbus_TCP/tcp/mbtcp.c:92:1:eMBTCPStart	1
+../Drivers/FreeModbus_TCP/tcp/mbtcp.c:97:1:eMBTCPStop	1
+../Drivers/FreeModbus_TCP/tcp/mbtcp.c:104:1:eMBTCPReceive	3
+../Drivers/FreeModbus_TCP/tcp/mbtcp.c:136:1:eMBTCPSend	2

@@ -1,0 +1,6 @@
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:116:6:MX_GPIO_Init	4	static
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:135:6:MX_SPI_Init	8	static
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:158:6:MX_SPI1_Init	24	static
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:255:6:MX_SPI3_Init	24	static
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:350:6:MX_USART2_Init	8	static
+../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:368:6:MX_ADC1_Init	32	static
