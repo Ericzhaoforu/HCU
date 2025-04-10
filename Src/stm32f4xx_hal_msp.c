@@ -261,12 +261,5 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     BSP_MotorControl_FlagInterruptHandler();
   }
  }
-/**
-  * @}
-  */
 
-/**
-  * @}
-  */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

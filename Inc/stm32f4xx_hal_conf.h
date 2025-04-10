@@ -218,7 +218,8 @@
 #define PHY_MICR                        ((uint16_t)0x11)    /*!< MII Interrupt Control Register                  */
 #define PHY_MISR                        ((uint16_t)0x12)    /*!< MII Interrupt Status and Misc. Control Register */
  
-#define PHY_LINK_STATUS                 ((uint16_t)0x0001)  /*!< PHY Link mask                                   */
+//#define PHY_LINK_STATUS                 ((uint16_t)0x0001)  /*!< PHY Link mask                                   */
+#define PHY_LINK_STATUS               ((uint16_t)0x0004U)
 #define PHY_SPEED_STATUS                ((uint16_t)0x0002)  /*!< PHY Speed mask                                  */
 #define PHY_DUPLEX_STATUS               ((uint16_t)0x0004)  /*!< PHY Duplex mask                                 */
 

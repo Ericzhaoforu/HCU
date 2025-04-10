@@ -77,7 +77,7 @@ void Error_Handler();
 #include "uart.h"
 #include "tim.h"
 #include "i2c.h"
-
+#include "adc.h"
 #include "ssd1306_fonts.h"
 #include "ssd1306.h"
 #include "ssd1306_conf.h"
@@ -85,16 +85,15 @@ void Error_Handler();
 /* Exported constants --------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 void SystemClock_Config(void);
-
 void MyErrorHandler(uint16_t error);
-
 void Roplus_Pin_Init();
 void showscreen(void);
-uint32_t  Get_Desired_Postion_By_Cmd(uint8_t desireVal);
-
+void clearscreen(void);
 void Update_Home_Status();
 void Update_Motor_Pos();
 #ifdef USE_POWERSTEP
+static void MyBusyInterruptHandler(void);
+static void MyFlagInterruptHandler(void);
 extern union powerstep01_Init_u initDeviceParameters;
 void Motor_Find_Home(uint8_t deviceId,motorDir_t dir, uint32_t speed);
 void Motor_Find_Upper_Position(uint8_t deviceId,motorDir_t dir, uint32_t speed);
@@ -106,41 +105,74 @@ MotorParameterData_t *GetMotorParameterInitData(void);
 void Motor_Find_Home(uint8_t deviceId,eL6470_DirId_t dir, uint32_t speed);
 void Motor_Find_Upper_Position(uint8_t deviceId,eL6470_DirId_t dir, uint32_t speed);
 #endif
-void Update_Gear_Status(uint8_t GearVal);
-void Pull_And_Run_Motor();
-uint8_t PinState_To_Int(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);
-uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength);
-void BufferInit(uint8_t* pBuffer1, uint8_t* pBuffer2, char *string ,uint16_t BufferLength);
-void BufferCopy(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength);
-uint32_t BufferParse(uint8_t* posBuffer);
+
+void Update_Gear_Status();
+
 #endif /* __MAIN_H */
-void suction_test();
 #define SENSOR_EXTI_PIN GPIO_PIN_0//DIN 05
 #define SENSOR_EXTI_PIN_UPPER GPIO_PIN_3//DIN 06
 #define SENSOR_EXTI_PORT GPIOA
-#define UR_INPUT_PORT GPIOE
-#define UR_INPUT_PIN1 GPIO_PIN_4//DIN 02
-#define UR_INPUT_PIN2 GPIO_PIN_5//DIN 03
-#define UR_INPUT_PIN3 GPIO_PIN_6//DIN 04
+
+#define UR_IO_PORT GPIOE
+#define UR_IO_ENABLE_PIN GPIO_PIN_2 //DIN 00
+#define UR_IO_PIN1 GPIO_PIN_3//DIN 01
+#define UR_IO_PIN2 GPIO_PIN_4//DIN 02
+
+#define UR_IO_PIN3 GPIO_PIN_6//DIN 03
+#define UR_IO_PIN4 GPIO_PIN_6//DIN 04
+#define UR_IO_SUCTION_PIN GPIO_PIN_7//DIN 07
+
+#define MOTOR_READY_DIGITAL_OUTPUT_PORT GPIOB
+#define MOTOR_READY_DIGITAL_OUTPUT_PIN GPIO_PIN_6//DOUT 05
 
 #define VALVE_PORT GPIOD
+#define VALVE_PORT_BENDING GPIOE
 
-//PA2 cannnot be used, because this pin is used in ModBus
-//#define UR_OUTPUT_PIN1 GPIO_PIN_2
-#define VALVE_1_PIN GPIO_PIN_7//DOUT 08
-#define VALVE_2_PIN GPIO_PIN_11//DOUT 02
-#define VALVE_3_PIN GPIO_PIN_14//DOUT 03
-#define VALVE_4_PIN GPIO_PIN_15//DOUT 04
+#define VALVE_SUCTION_PIN GPIO_PIN_15//DOUT 04  PD15 suction
+#define VALVE_BENDING_C_PIN GPIO_PIN_14//DOUT 03  PD14 bending C 
+#define VALVE_BENDING_O_PIN GPIO_PIN_10//DOUT 01  PE10 bending_O
+#define VALVE_JAMMING_PIN GPIO_PIN_11//DOUT 02  PD11 jamming 
 #define VALVE_NUM 4
 
 #define SENSOR_EXTI_LINE_IRQn EXTI0_IRQn
 #define LED_DIAG_PORT GPIOC
 #define LED_DIAG2_PIN GPIO_PIN_8
 #define LED_DIAG1_PIN GPIO_PIN_9
+
 #define LED_STATUS_PORT GPIOE
 #define LED_RUN_PIN GPIO_PIN_0
 #define LED_COMM_PIN GPIO_PIN_1
+
 #define SPEED_IN_STEP_S_HIGH 400
 #define SPEED_IN_STEP_S_LOW 200
+
 #define RX_BUFFERSIZE 8
+#define PHY_LINK_STATUS               ((uint16_t)0x0004U)
+
+void MX_ADC1_Init(void);
+void MX_ADC2_Init(void);
+void screenmenu(void);
+uint8_t DetectEthernetCable(void);
+void Rotate_Motor(int32_t d_Pos);
+void Update_gear_buf();
+void Update_Suction_Status_Led();
+void Update_Eth_Status_Led();
+void Show_Err_Led();
+int32_t Gear_To_Position(uint8_t gear);
+int32_t Pos_Saturate(int32_t pos);
+
+#define POS_LOWER_LIMIT 200000
+#define POS_UPPER_LIMIT 2200000
+#define GEAR1_POS 200000
+#define GEAR2_POS 1100000
+#define GEAR3_POS 2200000
+//1200: 14s
+//1500 slip
+#define MOTOR_SPEED 900.0
+#define MOTOR_SPEED_MAX 1200.0
+#define MOTOR_SPEED_MIN 0.0
+#define MOTOR_ACC 8000.0
+
+//home speed, dont care
+#define MOTOR_HOME_SPEED 15000
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

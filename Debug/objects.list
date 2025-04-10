@@ -192,6 +192,7 @@
 "./Middlewares/Third_Party/LwIP/src/netif/ppp/upap.o"
 "./Middlewares/Third_Party/LwIP/src/netif/ppp/utils.o"
 "./Middlewares/Third_Party/LwIP/src/netif/ppp/vj.o"
+"./Src/adc.o"
 "./Src/clock_f4.o"
 "./Src/i2c.o"
 "./Src/main.o"

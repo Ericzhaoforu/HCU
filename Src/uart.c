@@ -1,5 +1,6 @@
 #include "uart.h"
 #include <string.h>
+#include <stdbool.h>
 UART_HandleTypeDef huart1;
 /**
   * @brief UART5 Initialization Function
@@ -67,3 +68,92 @@ void Uart_Send(char *string)
   HAL_UART_Transmit_IT(&huart1, (uint8_t *) string, len);
 	//HAL_UART_Transmit(&huart5, (uint8_t *) string, len, HAL_MAX_DELAY);  // transmit in blocking mode
 }
+
+
+void BufferInit(uint8_t* pBuffer1, uint8_t* pBuffer2, char *string ,uint16_t BufferLength)
+{
+  if (strlen(string) != BufferLength)
+  {
+    while(BufferLength--)
+    {
+      *pBuffer1 = 'E';
+      *pBuffer2 = 'E';
+      pBuffer1++;
+      pBuffer2++;
+    }
+  }
+  else{
+    while(BufferLength--)
+    {
+      *pBuffer1 = *pBuffer2 = *string;
+      pBuffer1++;
+      pBuffer2++;
+      string++;
+    }
+  }
+}
+
+void BufferCopy(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+{
+  while (BufferLength--)
+  {
+    *pBuffer2= *pBuffer1;
+    pBuffer1++;
+    pBuffer2++;
+  }
+}
+
+int32_t BufferParse(uint8_t* posBuffer)
+{
+  //minimum postion
+  int32_t pos = 0;
+  /*Double Check the msg*/
+  if(posBuffer[0] !='A')
+  {
+    return -1;
+  }
+  //check the buffer data vaildity
+  for (int i=6;i<=7;i++)
+  {
+    if(posBuffer[i]!= '0' && posBuffer[i]!= '1')
+    {
+      //Uart_Send("here");
+      return -1;
+    }
+  }
+  uint8_t gear = (posBuffer[7]-48)*1+(posBuffer[6]-48)*2;
+  
+  pos = Gear_To_Position(gear);
+  if(pos== -1)
+  {
+    return -1;
+  }
+  return pos;
+}
+
+uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+{
+  while (BufferLength--)
+  {
+    if ((*pBuffer1) != *pBuffer2)
+    {
+      return 1;
+    }
+    pBuffer1++;
+    pBuffer2++;
+  }
+
+  return 0;
+}
+
+uint32_t usrPow(uint8_t base, uint8_t exponent)
+{
+  uint8_t i;
+  uint32_t power = 1;
+  
+  for (i=0; i<exponent; i++)
+    power *= base;
+  
+  return power;
+}
+

@@ -19,31 +19,39 @@
 static volatile uint16_t gLastError;
 bool is_home=FALSE;
 int32_t cur_pos;
-uint8_t cur_gear_pos;
+int32_t Desired_Pos;
+char gear_status[2];
 uint32_t counter = 0;
 int16_t count = 0;
 int16_t position = 0;
-uint32_t usrPow(uint8_t base, uint8_t exponent);
+
 uint8_t Rx_Buffer[RX_BUFFERSIZE];
 uint8_t Rx_Buffer_former[RX_BUFFERSIZE];
 uint8_t board;
 uint8_t gripper_motor;
 uint8_t test_motor;
-uint16_t GPIO_VALVES[VALVE_NUM] = {VALVE_1_PIN,VALVE_2_PIN,VALVE_3_PIN,VALVE_4_PIN};
-//Handler & Parameter container
-StepperMotorBoardHandle_t *StepperMotorBoardHandle;
-MotorParameterData_t *MotorParameterDataGlobal, *MotorParameterDataSingle;
-//STM32 WRITE BUF
+uint16_t GPIO_VALVES[VALVE_NUM] = {VALVE_SUCTION_PIN,VALVE_BENDING_C_PIN,VALVE_BENDING_O_PIN,VALVE_JAMMING_PIN};
+
+//STM32 WRITE BUFgi
 uint8_t REG_DISC_BUF[10]={0,0,0,0,0,0,0,0,0,0};
 //STM32 READ BUF
 uint8_t REG_COILS_BUF[10]={0,0,0,0,0,0,0,0,0,0};
 uint8_t REG_COILS_BUF_FORMER[10]={0,0,0,0,0,0,0,0,0,0};
-bool cleared = TRUE;
 
-#ifdef USE_POWERSTEP
-/* Private function prototypes -----------------------------------------------*/
-static void MyBusyInterruptHandler(void);
-static void MyFlagInterruptHandler(void);
+uint8_t suction_bit = 0;
+uint8_t suction_bit_former = 0;
+uint8_t eth_status = 0;
+uint8_t eth_status_former = 0; 
+uint8_t gear_buff_former[2] = {0,0};
+uint8_t gear_buff[2] = {0,0};
+uint32_t Vacuum_ADCvalues;
+bool cleared = TRUE;
+bool ps_error = FALSE;
+
+#ifdef USE_L6470
+//Handler & Parameter container for L6470PD
+StepperMotorBoardHandle_t *StepperMotorBoardHandle;
+MotorParameterData_t *MotorParameterDataGlobal, *MotorParameterDataSingle;
 #endif
 
 int main(void)
@@ -56,39 +64,34 @@ int main(void)
   
   /*Initialize pin used for Roplus*/
   Roplus_Pin_Init();
-  //led test
-  // HAL_GPIO_WritePin(LED_STATUS_PORT,LED_RUN_PIN,GPIO_PIN_SET);
-  // HAL_GPIO_WritePin(LED_STATUS_PORT,LED_COMM_PIN,GPIO_PIN_SET);
-  // HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG1_PIN,GPIO_PIN_RESET);
-  // HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_SET);
   
   /*UART initialization, used for debug*/
   MX_USART1_Init();
   Uart_Send("UART OK!\n");
   HAL_Delay(100);
-//  while(1)
-//  {
-//    HAL_GPIO_TogglePin(LED_STATUS_PORT,LED_RUN_PIN);
-//    Uart_Send("UART OK!\n");
-//    HAL_Delay(1000);
-//  }
+
+  //Modbus initialization
   MX_LWIP_Init();
   ModbusTCPInit();
   Uart_Send("Modbus OK!\n");
   HAL_Delay(100);
 
-//  #ifdef USE_L6470
-    /*Initialize the SPI used by the X-NUCLEO-IMH02A1*/
+  //ADC initialization
+  MX_ADC1_Init();
+  MX_ADC2_Init();
+  Uart_Send("ADC OK!\n");
+  HAL_Delay(100);
 
+  #ifdef USE_L6470
+    /*Initialize the SPI used by the X-NUCLEO-IMH02A1*/
     MX_SPI_Init();
-//    HAL_Delay(100);
+    // HAL_Delay(100);
     Uart_Send("SPI-L6470 OK!\n");
     HAL_Delay(100);
     /* X-NUCLEO-IHM02A1 initialization */
     BSP_Init();
     Uart_Send("BSP-L6470 OK!\n");
-
-//  #endif
+  #endif
 
   /*LED screen initialization*/
   MX_I2C1_Init();
@@ -108,6 +111,12 @@ int main(void)
   HAL_UART_Transmit_IT(&huart1, (uint8_t *) Rx_Buffer, RX_BUFFERSIZE);
   HAL_Delay(100);
   HAL_UART_Transmit_IT(&huart1, (uint8_t *) Rx_Buffer_former, RX_BUFFERSIZE);
+  //show screen menu, indicate the homing process
+  clearscreen();
+  eth_status = DetectEthernetCable();
+  eth_status_former = eth_status;
+  Update_Eth_Status_Led();
+  screenmenu();
   /*execute home process, for L6470 & POWERSTEP respectively*/
   #ifdef USE_L6470
     uint8_t id;
@@ -132,21 +141,15 @@ int main(void)
     test_motor =L6470_ID(1);
 
     /*Go Home, Test needed to define the right rotation direction*/
-    Motor_Find_Home(gripper_motor,L6470_DIR_REV_ID,Step_s_2_Speed(5000));
+    Motor_Find_Home(gripper_motor,L6470_DIR_REV_ID,Step_s_2_Speed(MOTOR_HOME_SPEED));
     /*Can use this function to find to upper position of the motor, orange light should  be on to indicate finish*/
     //Motor_Find_Upper_Position(gripper_motor,L6470_DIR_FWD_ID,Step_s_2_Speed(5000));
-    Update_Motor_Pos();
-    
-    //Just for test, To make sure everything is working well
-    // StepperMotorBoardHandle->Command->Move(board, test_motor, L6470_DIR_FWD_ID, 200*128*5);
-    // while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, test_motor, BUSY_ID) == 0);
-    // StepperMotorBoardHandle->Command->Move(board, test_motor, L6470_DIR_REV_ID, 200*128*5);
-    // while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, test_motor, BUSY_ID) == 0);
+    //Update_Motor_Pos();
 
   #endif
 
   #ifdef USE_POWERSTEP
-    //----- Init of the Powerstep01 library 
+    //----- Init of the Powerstep01 library, SPI also initialized here
     /* Set the Powerstep01 library to use 1 device */
     BSP_MotorControl_SetNbDevices(BSP_MOTOR_CONTROL_BOARD_ID_POWERSTEP01, 1);
     /* When BSP_MotorControl_Init is called with NULL pointer,                  */
@@ -177,91 +180,205 @@ int main(void)
   #endif
     /*DIAG2 LED solid on to indicate initialize compeleted*/
     HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_SET);
+    
   while(1)
   {
     //Get Modbus data
     MX_LWIP_Process();
 	  ModbusTCPMain();
-
-    /*STM32 READ BUF:REG_COILS_BUF*/
-    /*if REG_COIL_BUF changed, we need to open the valves, and we only compare first 4 bits as we have 4 valves*/
-    if(Buffercmp((uint8_t *) REG_COILS_BUF,(uint8_t *)REG_COILS_BUF_FORMER,VALVE_NUM) != 0)
+    if (ps_error)
     {
-      //open the valves accordingly
-      for(int i=0; i<VALVE_NUM; i++)
+      continue;
+    }
+    
+    //If the first bit of REG_COILS_BUF is 1 or the UR_IO_ENABLE_PIN is high, means the robot arm is moving, or the ps_error is set, so just skip the loop
+    if(REG_COILS_BUF[0] ==1 || (HAL_GPIO_ReadPin(UR_IO_PORT,UR_IO_ENABLE_PIN)==GPIO_PIN_RESET))
+    {
+      // if (HAL_GPIO_ReadPin(UR_IO_PORT,UR_IO_ENABLE_PIN)==GPIO_PIN_SET)
+      // {
+      //   Uart_Send("I/O high\n");
+      // }
+      //Blink the COMM LED to indicate the error
+      HAL_GPIO_TogglePin(LED_STATUS_PORT,LED_COMM_PIN);
+      HAL_Delay(100);
+      if (cleared ==FALSE)
       {
-        /*if currently the valve is close, we open it*/
-        if(REG_COILS_BUF[i]==1  && HAL_GPIO_ReadPin(VALVE_PORT,GPIO_VALVES[i])==GPIO_PIN_RESET && REG_COILS_BUF_FORMER[i]==0)
+        cleared = TRUE;
+      }
+      REG_DISC_BUF[0]=0;
+      HAL_GPIO_WritePin(MOTOR_READY_DIGITAL_OUTPUT_PORT,MOTOR_READY_DIGITAL_OUTPUT_PIN,GPIO_PIN_RESET);
+      continue;
+    }
+    //The arm is not moving, so we can move the motor, this is achieved by get the desired position from three control intereface
+    //Modbus TCP, UART, and UR IO
+    else
+    {
+      // first get desired position from uart, to check if a msg come and modified the desired position
+      #ifdef USE_L6470
+      //Receive Motor Running Cmd Using Uart
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)Rx_Buffer,RX_BUFFERSIZE);
+      #endif
+
+      #ifdef USE_POWERSTEP
+      Pull_And_Run_Motor();
+      #endif
+      if(cleared == FALSE)
+      {
+        continue;
+      }
+      //Then we check the UR IO combine with the modbus and move the motor
+      Update_gear_buf();
+      //if the bits have changed, we need to run the motor
+      if(Buffercmp((uint8_t *) gear_buff,(uint8_t *)gear_buff_former,2) != 0)
+      {
+        uint8_t gear  = gear_buff[0]*2+gear_buff[1]*1;
+        Desired_Pos = Gear_To_Position(gear);
+        if(Desired_Pos == -1)
         {
-          HAL_GPIO_WritePin(VALVE_PORT,GPIO_VALVES[i],GPIO_PIN_SET);
-          /*Renew the former buffer*/
-          REG_COILS_BUF_FORMER[i]=REG_COILS_BUF[i];
           continue;
         }
-        /*if currently the valve is open, we close it*/
-        if(REG_COILS_BUF[i]==0 && HAL_GPIO_ReadPin(VALVE_PORT,GPIO_VALVES[i])==GPIO_PIN_SET && REG_COILS_BUF_FORMER[i]==1 )
-        {
-          HAL_GPIO_WritePin(VALVE_PORT,GPIO_VALVES[i],GPIO_PIN_RESET);
-          /*Renew the former buffer*/
-          REG_COILS_BUF_FORMER[i]=REG_COILS_BUF[i];
-          continue;
-        }
+        Desired_Pos = Pos_Saturate(Desired_Pos);
+        Rotate_Motor(Desired_Pos);
+        REG_DISC_BUF[0]=1;
+        HAL_GPIO_WritePin(MOTOR_READY_DIGITAL_OUTPUT_PORT,MOTOR_READY_DIGITAL_OUTPUT_PIN,GPIO_PIN_SET);
+        gear_status[0] = gear/10+'0';
+        gear_status[1] = gear%10+'0';
+        Update_Gear_Status();
+        BufferCopy((uint8_t *) gear_buff,(uint8_t *)gear_buff_former,2); 
       }
     }
-    //if REG_COILS_BUF[4]==1, means the arm is moving so we can clear the size register
-    if(REG_COILS_BUF[VALVE_NUM]==1 && cleared ==FALSE)
+    //suction can be triggered at any time, as long as there's no error from thr pressure sensor
+    suction_bit = (REG_COILS_BUF[3]==1) || (HAL_GPIO_ReadPin(UR_IO_PORT,UR_IO_SUCTION_PIN)== GPIO_PIN_RESET);
+    if(suction_bit !=suction_bit_former)
     {
-      REG_DISC_BUF[0]=0;
-      REG_DISC_BUF[1]=0;
-      REG_DISC_BUF[2]=0;
-      cleared = TRUE;
+      suction();
+      if(!ps_error)
+      {
+        suction_bit_former = suction_bit;
+        Update_Suction_Status_Led();
+      }
+      else
+      {
+        Show_Err_Led();
+      }
+    }
+    //Update Ethernet status
+    eth_status = DetectEthernetCable();
+    if(eth_status!=eth_status_former)
+    {
+      Update_Eth_Status_Led();
+      eth_status_former = eth_status;
     }
     HAL_Delay(100);
-    #ifdef USE_POWERSTEP
-    Pull_And_Run_Motor();
-    #endif
-    #ifdef USE_L6470
-     //Receive Motor Running Cmd Using Uart
-    HAL_UART_Receive_IT(&huart1, (uint8_t *)Rx_Buffer,RX_BUFFERSIZE);
-    #endif
     /*whiting for control input, DIAG1 led blinking*/
     HAL_GPIO_TogglePin(LED_DIAG_PORT,LED_DIAG1_PIN);
   }
 
 }
 
+
+//Receive process finished
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+  /*Received, toggle COMM LED*/
+  HAL_GPIO_TogglePin(LED_STATUS_PORT,LED_COMM_PIN);
+  //Different Msg Received
+  if(Buffercmp((uint8_t *) Rx_Buffer,(uint8_t *)Rx_Buffer_former,RX_BUFFERSIZE) != 0)
+  {
+    //HAL_USART_Transmit_IT(&huart5, (uint8_t *) Rx_Buffer, RX_BUFFERSIZE);
+    if(Rx_Buffer[0] != 'A')
+    {
+      return;
+    }
+    /*Parse the string and get the desired motor position*/
+    else
+    {
+      //The arm is running, so cannot response, just skip
+      if(REG_COILS_BUF[0]==1)
+      {
+        return;
+      }
+      BufferCopy((uint8_t *) Rx_Buffer,(uint8_t *)Rx_Buffer_former,RX_BUFFERSIZE);
+      //HAL_USART_Transmit_IT(&huart5, (uint8_t *) Rx_Buffer_former, RX_BUFFERSIZE);
+      
+      //Get Desired Pos
+      Desired_Pos = BufferParse((uint8_t *) Rx_Buffer);
+      // if(Desired_Pos == -1)
+      // {
+      //   Uart_Send("inp");
+      // }
+      /*Successful parsed*/
+      if(Desired_Pos != -1)
+      {
+        if(Desired_Pos!=cur_pos)
+        {
+          /*Double check the range*/
+          Desired_Pos=Pos_Saturate(Desired_Pos);
+          /*One Direction*/
+          Rotate_Motor(Desired_Pos);
+          REG_DISC_BUF[0]=1;
+          HAL_GPIO_WritePin(MOTOR_READY_DIGITAL_OUTPUT_PORT,MOTOR_READY_DIGITAL_OUTPUT_PIN,GPIO_PIN_SET);
+          uint8_t gear = (Rx_Buffer[7]-48)*1+(Rx_Buffer[6]-48)*2+(Rx_Buffer[5]-48)*4+(Rx_Buffer[4]-48)*8;
+          gear_status[0] = gear/10+'0';
+          gear_status[1] = gear%10+'0';
+          Update_Gear_Status();          
+          cleared = FALSE; 
+          Uart_Send("M");
+        }
+      }
+    }
+  }
+  //Same Msg Received, the motor shouldn't move, but we need to move the robot arm
+  else
+  {
+    /*Same buffer, so no need to check whether the first byte is equal to 'A'*/
+    //The arm is running, so cannot response, just skip
+    if(REG_COILS_BUF[0]==1)
+    {
+      return;
+    }
+    //Get Desired Pos
+    //Desired_Pos = BufferParse((uint8_t *) Rx_Buffer);
+    REG_DISC_BUF[0]=1;
+    HAL_GPIO_WritePin(MOTOR_READY_DIGITAL_OUTPUT_PORT,MOTOR_READY_DIGITAL_OUTPUT_PIN,GPIO_PIN_SET);
+    uint8_t gear = (Rx_Buffer[7]-48)*1+(Rx_Buffer[6]-48)*2+(Rx_Buffer[5]-48)*4+(Rx_Buffer[4]-48)*8;
+    gear_status[0] = gear/10+'0';
+    gear_status[1] = gear%10+'0';
+    Update_Gear_Status();
+    cleared = FALSE;
+    Uart_Send("M");
+  }
+}
+
 void showscreen(void){
-      ssd1306_Line(0,0,0,63,White);
-      ssd1306_Line(1,0,127,0,White);
-      ssd1306_Line(127,1,127,63,White);
-      ssd1306_Line(1,63,126,63,White);
-      ssd1306_Line(1,13,126,13,White);
-      ssd1306_Line(1,25,126,25,White);
-      ssd1306_Line(1,37,126,37,White);
-      ssd1306_SetCursor(1,3);
-      ssd1306_WriteString("      Roplus      ", Font_7x10, White);
-      Update_Home_Status();
-      ssd1306_SetCursor(1,27);
-      ssd1306_WriteString(" Pos: ", Font_7x10, White);
-      ssd1306_SetCursor(1,44);
-      ssd1306_WriteString("  Gear :    NA    ", Font_7x10, White);  
-      ssd1306_UpdateScreen();
-      HAL_Delay(200);
+    ssd1306_Line(0,0,0,63,White);
+    ssd1306_Line(1,0,127,0,White);
+    ssd1306_Line(127,1,127,63,White);
+    ssd1306_Line(1,63,126,63,White);
+    ssd1306_SetCursor(1,3);
+    ssd1306_WriteString("      Roplus      ", Font_7x10, White);
+    ssd1306_SetCursor(1,20);
+    ssd1306_WriteString("   Initializing    ", Font_7x10, White);
+    ssd1306_UpdateScreen();
+    //HAL_Delay(200);
+}
+
+void clearscreen(void){
+  ssd1306_Fill( Black );
+  ssd1306_UpdateScreen();
 }
 
 void Update_Home_Status()
 {
-  char Home_Flag[9]=" HOME:";
-  ssd1306_SetCursor(1,15);
+  ssd1306_SetCursor(56,53);
   if(is_home ==FALSE)
   {
-      strcat(Home_Flag,"F ");
+    ssd1306_WriteString("F",Font_7x10, White);
   }
   else
   {
-      strcat(Home_Flag,"T ");
+    ssd1306_WriteString("T",Font_7x10, White);
   }
-  ssd1306_WriteString(Home_Flag,Font_7x10, White);
 }
 #ifdef USE_POWERSTEP
 void Motor_Find_Home(uint8_t deviceId,motorDir_t dir, uint32_t speed)
@@ -486,7 +603,6 @@ void MyFlagInterruptHandler(void)
   }      
 
 }
-
 /**
   * @brief  This function is the User handler for the busy interrupt
   * @param  None
@@ -511,34 +627,31 @@ void MyBusyInterruptHandler(void)
 void Update_Motor_Pos()
 {
   //Position start cursor
-  ssd1306_SetCursor(43,27);
+ // ssd1306_SetCursor(43,27);
   //Clear Screen first
-  ssd1306_WriteString("            ", Font_7x10, White); 
-  ssd1306_UpdateScreen();
-  ssd1306_SetCursor(43,27);
+  // ssd1306_WriteString("            ", Font_7x10, White); 
+  // ssd1306_UpdateScreen();
+  // ssd1306_SetCursor(43,27);
   #ifdef USE_POWERSTEP
   cur_pos = BSP_MotorControl_GetPosition(0);
   #endif
   #ifdef USE_L6470
   cur_pos = (int32_t)StepperMotorBoardHandle->Command->GetParam(board, gripper_motor, L6470_ABS_POS_ID);
   #endif
-  char position[11];
-  sprintf(position, "%ld", cur_pos);
-  ssd1306_WriteString(position, Font_7x10, White);    
-  ssd1306_UpdateScreen();
+  // char position[11];
+  // sprintf(position, "%ld", cur_pos);
+  // ssd1306_WriteString(position, Font_7x10, White);    
+  // ssd1306_UpdateScreen();
 }
 
-void Update_Gear_Status(uint8_t GearVal)
+void Update_Gear_Status()
 {
-  char Gear[3]; 
-  char Gear_Status[3]=" ";
-  sprintf(Gear,"%d", GearVal);
-  strcat(Gear_Status,Gear);
-  ssd1306_SetCursor(84,44);
-  ssd1306_WriteString(Gear_Status,Font_7x10,White);
+  ssd1306_SetCursor(112,53);
+  ssd1306_WriteString(gear_status,Font_7x10,White);
   ssd1306_UpdateScreen();
 }
 
+#ifdef POWERSTEP
 void Pull_And_Run_Motor()
 {
   // Cmd is not enabled, just return
@@ -572,61 +685,7 @@ void Pull_And_Run_Motor()
     }
   }
 }
-
-uint8_t PinState_To_Int(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin)
-{
-  if(HAL_GPIO_ReadPin(GPIOx,GPIO_Pin)== GPIO_PIN_SET)
-  {
-    return 1;
-  }
-
-  if(HAL_GPIO_ReadPin(GPIOx,GPIO_Pin)== GPIO_PIN_RESET)
-  {
-    return 0;
-  }
-  return -1;
-}
-
-uint32_t Get_Desired_Postion_By_Cmd(uint8_t GearVal) 
-{
-  uint32_t desired_pos=-1;
-  switch (GearVal)
-  {
-  //Gear 0 
-  case 0:
-    desired_pos = 0;
-    break;  
-  //Gear 1
-  case 1:
-    desired_pos = 50000;
-    break;
-  //Gear 2
-  case 2:
-    desired_pos = 150000;
-    //desired_pos = 100000;
-    break;
-  //Gear 3
-  case 3:
-    desired_pos = 250000;
-    //desired_pos = 150000;
-    break;
-  //Gear 4
-  // case 4:
-  //   desired_pos = 200000;
-  //   break;
-  // //Gear 5
-  // case 5: 
-  //   desired_pos = 250000;
-  // //Gear 6
-  // case 6:
-  //   desired_pos = 265000;  
-  //Invailed Input
-  default:
-    desired_pos = -1; 
-    break;
-  }
-  return desired_pos;
-}
+#endif
 
 void Roplus_Pin_Init()
 { 
@@ -651,24 +710,37 @@ void Roplus_Pin_Init()
   HAL_GPIO_Init(SENSOR_EXTI_PORT, &GPIO_InitStruct);
 
   //Reset all values
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_RESET);
-
+  HAL_GPIO_WritePin(VALVE_PORT,VALVE_BENDING_C_PIN,GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(VALVE_PORT,VALVE_SUCTION_PIN,GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(VALVE_PORT,VALVE_JAMMING_PIN,GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(VALVE_PORT_BENDING,VALVE_BENDING_O_PIN,GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(MOTOR_READY_DIGITAL_OUTPUT_PORT,MOTOR_READY_DIGITAL_OUTPUT_PIN,GPIO_PIN_RESET);
   // Valves Pin init,
-  GPIO_InitStruct.Pin = VALVE_1_PIN|VALVE_2_PIN|VALVE_3_PIN|VALVE_4_PIN;
+  GPIO_InitStruct.Pin = VALVE_BENDING_C_PIN|VALVE_SUCTION_PIN|VALVE_JAMMING_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(VALVE_PORT, &GPIO_InitStruct);
-   
+  
+  GPIO_InitStruct.Pin = VALVE_BENDING_O_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(VALVE_PORT_BENDING, &GPIO_InitStruct);
+
+  //Motor Ready Pin init
+  GPIO_InitStruct.Pin = MOTOR_READY_DIGITAL_OUTPUT_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(MOTOR_READY_DIGITAL_OUTPUT_PORT, &GPIO_InitStruct);
+
   //UR input Pin init, no  pull  mode
-  GPIO_InitStruct.Pin = UR_INPUT_PIN1|UR_INPUT_PIN2|UR_INPUT_PIN3;
+  GPIO_InitStruct.Pin = UR_IO_ENABLE_PIN|UR_IO_PIN1|UR_IO_PIN2|UR_IO_PIN3|UR_IO_PIN4|UR_IO_SUCTION_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_MEDIUM;
-  HAL_GPIO_Init(UR_INPUT_PORT, &GPIO_InitStruct);
+  HAL_GPIO_Init(UR_IO_PORT, &GPIO_InitStruct);
 
   //LED Pin Init
   GPIO_InitStruct.Pin = LED_DIAG2_PIN|LED_DIAG1_PIN;
@@ -690,20 +762,9 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	counter = __HAL_TIM_GET_COUNTER(htim);
 	count = (int16_t)counter;
 	position = count/4;
-  //Can not concurrently update the screen
-  //HAL_GPIO_TogglePin(LED_PORT,LED2_PIN);
-  //   HAL_Delay(200);
-  // ssd1306_SetCursor(43,27);
-  // //Clear Screen first
-  // ssd1306_WriteString("            ", Font_7x10, White); 
-  // ssd1306_UpdateScreen();
-  // ssd1306_SetCursor(43,27);
-  // char pos_[11];
-  // sprintf(pos_, "%d", position);
-  // ssd1306_WriteString(pos_, Font_7x10, White);    
-  // ssd1306_UpdateScreen();
 }
 
+#ifdef USE_POWERSTEP
 void MyErrorHandler(uint16_t error)
 {
   /* Backup error number */
@@ -718,19 +779,7 @@ void MyErrorHandler(uint16_t error)
     HAL_Delay(100);
   }
 }
-
-void Error_Handler()
-{
-  __disable_irq();
-  while (1)
-  {
-    //BLINKE DIAG2 LED
-    HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_SET);
-    HAL_Delay(100);
-    HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_RESET);
-    HAL_Delay(100);
-  }
-}
+#endif
 
 #ifdef USE_L6470
 void Motor_Find_Home(uint8_t deviceId,eL6470_DirId_t dir, uint32_t speed)
@@ -742,16 +791,14 @@ void Motor_Find_Home(uint8_t deviceId,eL6470_DirId_t dir, uint32_t speed)
       HAL_GPIO_TogglePin(LED_DIAG_PORT,LED_DIAG2_PIN);
       HAL_Delay(200);
     }
-    //Set indicator
-    //HAL_GPIO_WritePin(LED_COMM_PORT,LED3_PIN,GPIO_PIN_SET);
     //Stop motor & set current position as home
     StepperMotorBoardHandle->Command->HardStop(board,deviceId);
     is_home = TRUE;
     StepperMotorBoardHandle->Command->ResetPos(board,deviceId);
     Update_Home_Status();
-    Update_Motor_Pos();
-    cur_gear_pos = 0;
-    Update_Gear_Status(cur_gear_pos);
+    gear_status[0] = 'H';
+    gear_status[1] = ' ';
+    Update_Gear_Status();
 }
 #endif
 
@@ -773,273 +820,166 @@ void Motor_Find_Upper_Position(uint8_t deviceId,eL6470_DirId_t dir, uint32_t spe
 }
 
 
-/**
-  * @brief  Calculates the power of a number.
-  * @param  base      the base
-  * @param  exponent  the exponent
-  * @retval power     the result as (base^exponent)
-  * @note   There is not OVF control.
-  */
-uint32_t usrPow(uint8_t base, uint8_t exponent)
-{
-  uint8_t i;
-  uint32_t power = 1;
-  
-  for (i=0; i<exponent; i++)
-    power *= base;
-  
-  return power;
+
+void screenmenu(void){
+  ssd1306_SetCursor(1,17);
+  ssd1306_WriteString(" SUCTION    ", Font_7x10, White);
+  ssd1306_SetCursor(1,29);
+  ssd1306_WriteString(" JAMMING    ", Font_7x10, White);
+  ssd1306_SetCursor(1,41);
+  ssd1306_WriteString(" BENDING    ", Font_7x10, White);
+  ssd1306_SetCursor(80,17);
+  ssd1306_WriteString(" OFF   ", Font_7x10, White);
+  ssd1306_SetCursor(80,41);
+  ssd1306_WriteString(" ---    ", Font_7x10, White);
+  ssd1306_SetCursor(80,29);
+  ssd1306_WriteString(" ---    ", Font_7x10, White);
+  ssd1306_SetCursor(1,53);
+  ssd1306_WriteString(" MOTOR: F  GEAR: A", Font_7x10, White);
+  ssd1306_UpdateScreen();
 }
 
-//Receive process finished
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-  /*Received, toggle COMM LED*/
-  HAL_GPIO_TogglePin(LED_STATUS_PORT,LED_COMM_PIN);
-  //Different Msg Received
-  if(Buffercmp((uint8_t *) Rx_Buffer,(uint8_t *)Rx_Buffer_former,RX_BUFFERSIZE) != 0)
-  {
-    //HAL_USART_Transmit_IT(&huart5, (uint8_t *) Rx_Buffer, RX_BUFFERSIZE);
-    if(Rx_Buffer[0] != 'A')
-    {
-      return;
-    }
-    /*Parse the string and get the desired motor position*/
-    else
-    {
-      //Inidicate one transmission complete, toggle the RUN LED
-      HAL_GPIO_TogglePin(LED_STATUS_PORT,LED_RUN_PIN);
-      //The arm is running, so cannot response, just skip
-      if(REG_COILS_BUF[VALVE_NUM]==1)
-      {
-        return;
+uint8_t DetectEthernetCable(void) {
+  uint32_t phyRegValue = 0;
+
+  if (HAL_ETH_ReadPHYRegister(&heth, 0x01, PHY_BSR, &phyRegValue) == HAL_OK) {
+      // Link Status
+      if (phyRegValue & PHY_LINK_STATUS) {
+          return 1;  // connected
       }
-      BufferCopy((uint8_t *) Rx_Buffer,(uint8_t *)Rx_Buffer_former,RX_BUFFERSIZE);
-      //HAL_USART_Transmit_IT(&huart5, (uint8_t *) Rx_Buffer_former, RX_BUFFERSIZE);
-      
-      //Get Desired Pos
-      uint32_t Desired_Pos = BufferParse((uint8_t *) Rx_Buffer);
-      /*Successful parsed*/
-      if(Desired_Pos != -1)
+  }
+
+  return 0;  // no connection
+}
+
+void Error_Handler()
+{
+  __disable_irq();
+  while (1)
+  {
+    //BLINKE DIAG2 LED
+    HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_SET);
+    HAL_Delay(100);
+    HAL_GPIO_WritePin(LED_DIAG_PORT,LED_DIAG2_PIN,GPIO_PIN_RESET);
+    HAL_Delay(100);
+  }
+}
+
+void Rotate_Motor(int32_t d_Pos)
+{
+  if(d_Pos>cur_pos)
+    {
+      StepperMotorBoardHandle->Command->GoToDir(board, gripper_motor, L6470_DIR_FWD_ID, d_Pos);
+      while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, gripper_motor, BUSY_ID) == 0)
       {
-        if(Desired_Pos!=cur_pos)
-        {
-          /*Double check the range*/
-          if(Desired_Pos >=2200000)
-          {
-            Desired_Pos =2200000;
-          }
-          if(Desired_Pos<=200000)
-          {
-            Desired_Pos = 200000;
-          }
-          /*One Direction*/
-          if(Desired_Pos>cur_pos)
-          {
-            StepperMotorBoardHandle->Command->GoToDir(board, gripper_motor, L6470_DIR_FWD_ID, Desired_Pos);
-            while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, gripper_motor, BUSY_ID) == 0)
-            {
-               //Just in case the motor reach upper limit
-                MX_LWIP_Process();
-	              ModbusTCPMain();
-            }
-            Update_Motor_Pos();
-            
-          }
-          /*Annother Direction*/
-          if(Desired_Pos<cur_pos)
-          {
-            StepperMotorBoardHandle->Command->GoToDir(board, gripper_motor, L6470_DIR_REV_ID, Desired_Pos);
-            while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, gripper_motor, BUSY_ID) == 0)
-            {
-              //Just in case the motor reach lower limit
-              MX_LWIP_Process();
-	            ModbusTCPMain();
-            }
-            Update_Motor_Pos();
-          }
-          /*Send Modbus Msg*/
-          /*Small Size*/
-          if(Desired_Pos<=500000)
-          {
-            REG_DISC_BUF[0]=1;
-          }
-          /*Middle Size*/
-          if(Desired_Pos>500000 && Desired_Pos<=1200000)
-          {
-            REG_DISC_BUF[1]=1;
-          }
-          /*Large Size*/
-          if(Desired_Pos >1200000&&Desired_Pos<=2200000)
-          {
-            REG_DISC_BUF[2]=1;
-          }
-          cleared = FALSE;
-          Uart_Send("M");
-        }
+          //Just in case the motor reach upper limit
+          MX_LWIP_Process();
+          ModbusTCPMain();
       }
+      //Update cur_pos
+      Update_Motor_Pos();
     }
-  }
-  //Same Msg Received, the motor shouldn't move, but we need to move the robot arm
-  else
-  {
+    /*Annother Direction*/
+    if(d_Pos<cur_pos)
+    {
+      StepperMotorBoardHandle->Command->GoToDir(board, gripper_motor, L6470_DIR_REV_ID, d_Pos);
+      while(StepperMotorBoardHandle->Command->CheckStatusRegisterFlag(board, gripper_motor, BUSY_ID) == 0)
+      {
+        //Just in case the motor reach lower limit
+        MX_LWIP_Process();
+        ModbusTCPMain();
+      }
+      Update_Motor_Pos();
+    }
+}
 
-    /*Same buffer, so no need to check whether the first byte is equal to 'A'*/
-    //HAL_GPIO_TogglePin(LED_PORT,LED2_PIN);
-    //The arm is running, so cannot response, just skip
-    if(REG_COILS_BUF[VALVE_NUM]==1)
-    {
-      return;
+void Update_gear_buf()
+{
+  gear_buff[0] = (REG_COILS_BUF[1]==1) || (HAL_GPIO_ReadPin(UR_IO_PORT,UR_IO_PIN1)== GPIO_PIN_RESET);
+  gear_buff[1] = (REG_COILS_BUF[2]==1) || (HAL_GPIO_ReadPin(UR_IO_PORT,UR_IO_PIN2)== GPIO_PIN_RESET);
+}
+
+void suction() {  //suction
+  if (suction_bit) {
+    HAL_GPIO_WritePin(VALVE_PORT, VALVE_SUCTION_PIN, GPIO_PIN_SET);
+      HAL_ADC_Start(&hadc1);
+   	  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+   	  Vacuum_ADCvalues=HAL_ADC_GetValue(&hadc1);//read suction adc value
+    if(Vacuum_ADCvalues > 1800)
+       {
+    	REG_DISC_BUF[5]=1;
+       }
+    else{
+    	REG_DISC_BUF[5]=0;//this is suction engaged bit in modbus buffer, used for ensuring safely suction
     }
-    //Get Desired Pos
-    uint32_t Desired_Pos = BufferParse((uint8_t *) Rx_Buffer);
-     /*Send Modbus Msg*/
-    /*Small Size*/
-    if(Desired_Pos<=500000)
-    {
-      REG_DISC_BUF[0]=1;
-    }
-    /*Middle Size*/
-    if(Desired_Pos>500000 && Desired_Pos<=1200000)
-    {
-      REG_DISC_BUF[1]=1;
-    }
-    /*Large Size*/
-    if(Desired_Pos >1200000&&Desired_Pos<=2200000)
-    {
-      REG_DISC_BUF[2]=1;
-    }
-    cleared = FALSE;
-    Uart_Send("M");
+  } else {
+	HAL_GPIO_WritePin(VALVE_PORT, VALVE_SUCTION_PIN, GPIO_PIN_RESET);
+	REG_DISC_BUF[5]=0;
   }
 }
 
-uint16_t Buffercmp(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+void Update_Suction_Status_Led()
 {
-  while (BufferLength--)
-  {
-    if ((*pBuffer1) != *pBuffer2)
-    {
-      return 1;
-    }
-    pBuffer1++;
-    pBuffer2++;
-  }
-
-  return 0;
-}
-void BufferInit(uint8_t* pBuffer1, uint8_t* pBuffer2, char *string ,uint16_t BufferLength)
-{
-  if (strlen(string) != BufferLength)
-  {
-    while(BufferLength--)
-    {
-      *pBuffer1 = 'E';
-      *pBuffer2 = 'E';
-      pBuffer1++;
-      pBuffer2++;
-    }
+  ssd1306_SetCursor(80,17);
+  if (suction_bit==1){
+    ssd1306_WriteString(" ON    ", Font_7x10, White);
   }
   else{
-    while(BufferLength--)
-    {
-      *pBuffer1 = *pBuffer2 = *string;
-      pBuffer1++;
-      pBuffer2++;
-      string++;
-    }
+  ssd1306_WriteString(" OFF   ", Font_7x10, White);
   }
+  ssd1306_UpdateScreen();
 }
 
-void BufferCopy(uint8_t* pBuffer1, uint8_t* pBuffer2, uint16_t BufferLength)
+void Update_Eth_Status_Led()
 {
-  while (BufferLength--)
+  ssd1306_SetCursor(1,3);
+  if (eth_status ==1)
   {
-    *pBuffer2= *pBuffer1;
-    pBuffer1++;
-    pBuffer2++;
+    ssd1306_WriteString(" MODBUS IO MODE     ", Font_7x10, White);
   }
-}
-uint32_t BufferParse(uint8_t* posBuffer)
-{
-  //minimum postion
-  uint32_t pos = 0;
-  /*Double Check the msg*/
-  if(posBuffer[0] !='A')
+  else
   {
+    ssd1306_WriteString(" IO ONLY MODE     ", Font_7x10, White);
+  }
+  ssd1306_UpdateScreen();
+}
+
+void Show_Err_Led()
+{
+  ssd1306_SetCursor(80,17);
+  ssd1306_WriteString(" ERR   ", Font_7x10, White);
+  ssd1306_UpdateScreen();
+}
+
+//gear value is from 1 - 3
+int32_t Gear_To_Position(uint8_t gear)
+{
+  switch (gear)
+  {
+  case 1:
+    return GEAR1_POS;
+    break;
+  case 2:
+    return GEAR2_POS;
+  case 3: 
+    return GEAR3_POS;
+  default:
     return -1;
+    break;
   }
-  bool find_first = false;
-  for(int i=1;i<=7;i++)
-  {
-    /*Find First None 0*/
-    if(find_first ==false && posBuffer[i]!='0')
-    {
-      find_first = true;
-      if(posBuffer[i]>=48 && posBuffer[i]<=57)
-      {
-        pos+=(posBuffer[i]-48)*usrPow(10,7-i);
-      }
-      else
-      {
-        return -1;
-      }
-      break;
-    }
-    if(find_first == true)
-    {
-      if(posBuffer[i]>=48 && posBuffer[i]<=57)
-      {
-        pos+=(posBuffer[i]-48)*usrPow(10,8-i);
-      }
-      else
-      {
-        return -1;
-      }
-    }
-  }
-  if(pos>=2200000)
-  {
-    pos = 2200000;
-  }
-  if(pos<=200000)
-  {
-    pos=200000;
-  }
-  return pos;
+
 }
 
-//suction process, just to test the whole logic
-void suction_test()
+int32_t Pos_Saturate(int32_t pos)
 {
-  //OPEN VALUE 3&4, BEGIN SUCTION
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_SET);
-  HAL_Delay(500);
-  //extention, open value 1&3
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_RESET);
-  HAL_Delay(500);
-  //bending &jamming, open 2
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_RESET);
-  HAL_Delay(500);
-  //bending open 3
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_SET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_RESET);
-  HAL_Delay(500);
-  //Reset
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_1_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_2_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_3_PIN,GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(VALVE_PORT,VALVE_4_PIN,GPIO_PIN_RESET);
-  HAL_Delay(500);
+  int32_t p = pos;
+  if(p>=POS_UPPER_LIMIT)
+  {
+    p = POS_UPPER_LIMIT;
+  }
+  if(p<=POS_LOWER_LIMIT)
+  {
+    p= POS_LOWER_LIMIT;
+  }
+  return p;
 }

@@ -3,4 +3,3 @@
 ../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:158:6:MX_SPI1_Init	9
 ../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:255:6:MX_SPI3_Init	9
 ../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:350:6:MX_USART2_Init	1
-../Drivers/BSP/X-NUCLEO-IHM02A1/xnucleoihm02a1_interface.c:368:6:MX_ADC1_Init	1
